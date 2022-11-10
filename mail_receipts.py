@@ -14,6 +14,7 @@ from datetime import datetime
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.exceptions import RefreshError
 
 from googleapiclient.discovery import build
 
@@ -27,6 +28,16 @@ DEBUG = False
 
 def authenticate():
     """Authenticate this app for Google APIs use. Return credentials."""
+
+    def getCredsFromAuthFlow(SCOPES):
+        # your creds file here. Please create json file as here:
+        # https://cloud.google.com/docs/authentication/getting-started
+        flow = InstalledAppFlow.from_client_secrets_file('credentials.json',
+                                                         SCOPES)
+        print()
+        creds = flow.run_local_server(port=0)
+        print()
+        return creds
 
     SCOPES = ['https://www.googleapis.com/auth/gmail.readonly',
               'https://www.googleapis.com/auth/gmail.modify',
@@ -43,13 +54,20 @@ def authenticate():
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except RefreshError as e:
+                print('\n!ERROR:', e.args[0])
+                ok = input("Type YES if you want to delete the expired "
+                           "token.json and try getting a new one: ")
+                if ok == "YES":
+                    os.remove('token.json')
+                    creds = getCredsFromAuthFlow(SCOPES)
+                else:
+                    print()
+                    exit()
         else:
-            # your creds file here. Please create json file as here:
-            # https://cloud.google.com/docs/authentication/getting-started
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
+            creds = getCredsFromAuthFlow(SCOPES)
 
         # Save the credentials for the next run
         with open('token.json', 'w') as token:
