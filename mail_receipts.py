@@ -15,7 +15,6 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.exceptions import RefreshError
-from googleapiclient.errors import HttpError
 
 from googleapiclient.discovery import build
 
@@ -220,6 +219,11 @@ def formatReceipt(msg):
         type = tmp[0] + ' x' + tmp[1]
         total = tmp[2]
         merchant = 'Parkmobile'
+    elif from_domain == "@zuppler.com":
+        tmp = re.findall(r"Payment: ([^\|]+)\|.*Total:\|([^\|]+)", out)[0]
+        type = tmp[0]
+        total = tmp[1]
+        merchant = 'Zuppler|' + re.findall(r"s*([^<]+) \<", from_name)[0]
     else:
         merchant = from_domain
         note = from_name + ' | ' + subject
