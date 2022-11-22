@@ -15,6 +15,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.exceptions import RefreshError
+from googleapiclient.errors import HttpError
 
 from googleapiclient.discovery import build
 
@@ -26,23 +27,25 @@ import json
 DEBUG = False
 
 
+def getCredsFromAuthFlow(SCOPES):
+    # your creds file here. Please create json file as here:
+    # https://cloud.google.com/docs/authentication/getting-started
+    flow = InstalledAppFlow.from_client_secrets_file('credentials.json',
+                                                     SCOPES)
+    print()
+    creds = flow.run_local_server(port=0)
+    print()
+    return creds
+
+
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly',
+          'https://www.googleapis.com/auth/gmail.modify',
+          'https://www.googleapis.com/auth/documents',
+          'https://www.googleapis.com/auth/drive']
+
+
 def authenticate():
     """Authenticate this app for Google APIs use. Return credentials."""
-
-    def getCredsFromAuthFlow(SCOPES):
-        # your creds file here. Please create json file as here:
-        # https://cloud.google.com/docs/authentication/getting-started
-        flow = InstalledAppFlow.from_client_secrets_file('credentials.json',
-                                                         SCOPES)
-        print()
-        creds = flow.run_local_server(port=0)
-        print()
-        return creds
-
-    SCOPES = ['https://www.googleapis.com/auth/gmail.readonly',
-              'https://www.googleapis.com/auth/gmail.modify',
-              'https://www.googleapis.com/auth/documents',
-              'https://www.googleapis.com/auth/drive']
 
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
@@ -167,6 +170,8 @@ def formatReceipt(msg):
                + str(datetime.now().year)
         type = re.findall(r"Payment method: (\S+ \S+)", snippet)[0]
         merchant = 'Tufts'
+        if total[-1] == '.':
+            total = total[:-1]
     elif from_domain == '@messaging.squareup.com':
         tmp = re.findall(r"You paid ([$0-9.]+) with your (.*) ending in (\d+)"
                          r" to ([\w ]+) on (\w+ \d+ \d+) at .*", out)[0]
@@ -201,6 +206,20 @@ def formatReceipt(msg):
         type = 'x'
         total = tmp
         merchant = 'BlueBikes'
+    elif from_domain == "@lyftmail.com":
+        tmp = re.findall(r"Lyft(?:\|[^\|]+)+(?:\|([^\|]+)"
+                         r" \*([0-9]+))"
+                         r"\|([^\|]+)(?:\|[^\|]+)+", out)[0]
+        type = tmp[0] + ' x' + tmp[1]
+        total = tmp[2]
+        merchant = 'Lyft'
+    elif from_domain == "@parkmobileglobal.com":
+        tmp = re.findall(r"Parkmobile(?:\|[^\|]+)+\|Payment Method\|(.*)"
+                         r" ending in ([0-9]+)"
+                         r".*Amount Paid\|([^\|]+)", out)[0]
+        type = tmp[0] + ' x' + tmp[1]
+        total = tmp[2]
+        merchant = 'Parkmobile'
     else:
         merchant = from_domain
         note = from_name + ' | ' + subject
@@ -209,8 +228,8 @@ def formatReceipt(msg):
 
     type = type.replace('American Express', 'Amex')
     if DEBUG:
-        print(f'date: {date}, type: {type}, total: {total}, \
-              merchant: {merchant}, note: {note}')
+        print(f'date: {date}, type: {type}, total: {total}, '
+              f'merchant: {merchant}, note: {note}')
     return {'date': date, 'type': type, 'total': total, 'merchant': merchant,
             'note': note, 'id': msgid}
 
@@ -244,9 +263,23 @@ def findReceiptsDoc(creds):
 
     # find all the files named 'Receipts', in the Google Drive root
     filename = 'Receipts' if not DEBUG else 'Receipts-test'
+
+    try:
+        creds.refresh(Request())
+    except RefreshError as e:
+        print('\n!ERROR:', e.args[0])
+        ok = input("Type YES if you want to delete the expired "
+                   "token.json and try getting a new one: ")
+        if ok == "YES":
+            os.remove('token.json')
+            creds = getCredsFromAuthFlow(SCOPES)
+            print('Re-run program')
+        print()
+        exit()
+
     service = build('drive', 'v3', credentials=creds)
-    files = service.files().list(q=f"name='{filename}' and trashed=false and "
-                                   f"'root' in parents", spaces='drive',
+    files = service.files().list(q=f"name='{filename}' and trashed=false "
+                                   f"and 'root' in parents", spaces='drive',
                                    fields='files(id)').execute()['files']
 
     # if we didn't find a Receipts file, make one
