@@ -173,7 +173,7 @@ def formatReceipt(msg):
             total = total[:-1]
     elif from_domain == '@messaging.squareup.com':
         tmp = re.findall(r"You paid ([$0-9.]+) with your (.*) ending in (\d+)"
-                         r" to ([\w ]+) on (\w+ \d+ \d+) at .*", out)[0]
+                         r" to ([^\|]+) on (\w+ \d+ \d+) at .*", out)[0]
         total = tmp[0]
         type = tmp[1] + ' x' + tmp[2]
         merchant = 'Square|' + tmp[3]
