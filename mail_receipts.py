@@ -159,11 +159,23 @@ def formatReceipt(msg):
     elif from_domain == '@paypal.com':
         tmp = re.findall(r'.*Transaction date(\w+ \d+, \d+).*'
                          r'your credit card statement as "([^\"]+).*'
-                         r'Sources Used[^\|]+\|([^\|]+)\|([$0-9.]+)', out)[0]
-        date = tmp[0].replace(',', '')
-        merchant = tmp[1]
-        type = tmp[2].replace('-', '')
-        total = tmp[3]
+                         r'Sources Used[^\|]+\|([^\|]+)\|([$0-9.]+)', out)
+        if tmp:
+            tmp = tmp[0]
+            date = tmp[0]
+            merchant = tmp[1]
+            type = tmp[2].replace('-', '')
+            total = tmp[3]
+
+        else:
+            tmp = re.findall(r'\|Date\|(\w{1,3})\w*( \d+, \d+).*'
+                             r'Purpose\|([^\|]+).*'
+                             r'Sources Used[^\|]+\|([^\|]+)\|([$0-9.]+)',
+                             out)[0]
+            date = tmp[0]+tmp[1]
+            type = tmp[3].replace('- ', '')
+            merchant = tmp[2]
+            total = tmp[4]
     elif from_domain == '@well-net.org':
         date = re.findall(r"Date: (\S+ \S+)", snippet)[0] + ' ' \
                + str(datetime.now().year)
@@ -230,7 +242,8 @@ def formatReceipt(msg):
         if not total:
             note += ' | ' + snippet
 
-    type = type.replace('American Express', 'Amex')
+    type = type.replace('American Express', 'Amex')\
+               .replace('DISCOVER', 'Discover')
     if DEBUG:
         print(f'date: {date}, type: {type}, total: {total}, '
               f'merchant: {merchant}, note: {note}')
