@@ -119,7 +119,7 @@ def formatReceipt(msg):
             if DEBUG:
                 print('\nfrom:', from_domain)
         if name == 'Date':
-            date = datetime.strptime(values['value'][5:16],
+            date = datetime.strptime(values['value'][5:16].strip(),
                                      '%d %b %Y').strftime('%b %d %Y')
         if name == 'Subject':
             subject = values['value']
