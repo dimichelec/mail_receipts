@@ -243,7 +243,8 @@ def formatReceipt(msg):
         total = tmp[1]
         merchant = 'Zuppler|' + re.findall(r"s*([^<]+) \<", from_name)[0]
     elif from_domain == "@privateinternetaccess.com":
-        tmp = re.findall(r"Payment method:\s+([^|]+).*\|TOTAL \(USD\)\:([^|]+)", out)[0]
+        tmp = re.findall(r"Payment method:\s+([^|]+).*\|"
+                         r"TOTAL \(USD\)\:([^|]+)", out)[0]
         type = tmp[0]
         total = tmp[1]
         merchant = 'Private Internet Access'
