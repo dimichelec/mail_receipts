@@ -220,10 +220,16 @@ def formatReceipt(msg):
     elif from_domain == "@lyftmail.com":
         tmp = re.findall(r"Lyft(?:\|[^\|]+)+(?:\|([^\|]+)"
                          r" \*([0-9]+))"
-                         r"\|([^\|]+)(?:\|[^\|]+)+", out)[0]
-        type = tmp[0] + ' x' + tmp[1]
-        total = tmp[2]
-        merchant = 'Lyft'
+                         r"\|([^\|]+)(?:\|[^\|]+)+", out)
+        if not tmp:
+            tmp = re.findall(r"Charges to ([^\|]+)"
+                             r" \*([0-9]+)"
+                             r"\:\|([^\|]+)", out)
+        if tmp:
+            tmp = tmp[0]
+            type = tmp[0] + ' x' + tmp[1]
+            total = tmp[2]
+            merchant = 'Lyft'
     elif from_domain == "@parkmobileglobal.com":
         tmp = re.findall(r"Parkmobile(?:\|[^\|]+)+\|Payment Method\|(.*)"
                          r" ending in ([0-9]+)"
@@ -236,6 +242,11 @@ def formatReceipt(msg):
         type = tmp[0]
         total = tmp[1]
         merchant = 'Zuppler|' + re.findall(r"s*([^<]+) \<", from_name)[0]
+    elif from_domain == "@privateinternetaccess.com":
+        tmp = re.findall(r"Payment method:\s+([^|]+).*\|TOTAL \(USD\)\:([^|]+)", out)[0]
+        type = tmp[0]
+        total = tmp[1]
+        merchant = 'Private Internet Access'
     else:
         merchant = from_domain
         note = from_name + ' | ' + subject
@@ -251,13 +262,13 @@ def formatReceipt(msg):
             'note': note, 'id': msgid}
 
 
-def createNewReceiptsDoc(creds, filename):
+def createNewReceiptsDoc(creds, filename, idFilename):
     """Create a new Receipts doc on the Google Drive using supplied
        credentials. Return new documentId."""
 
     # Remove the old docId json if it exists
-    if os.path.exists('docId.json'):
-        os.remove('docId.json')
+    if os.path.exists(idFilename):
+        os.remove(idFilename)
 
     service = build('docs', 'v1', credentials=creds)
     docId = service.documents().create(body={'title': filename})\
@@ -265,7 +276,7 @@ def createNewReceiptsDoc(creds, filename):
 
     # Save the docId to uniquely identify our doc next time
     js = json.dumps({'docId': docId})
-    with open('docId.json', 'w') as fout:
+    with open(idFilename, 'w') as fout:
         fout.write(js)
 
     return docId
@@ -280,6 +291,7 @@ def findReceiptsDoc(creds):
 
     # find all the files named 'Receipts', in the Google Drive root
     filename = 'Receipts' if not DEBUG else 'Receipts-test'
+    idFilename = 'docId.json' if not DEBUG else 'docId-test.json'
 
     try:
         creds.refresh(Request())
@@ -301,8 +313,8 @@ def findReceiptsDoc(creds):
 
     # if we didn't find a Receipts file, make one
     if files:
-        if os.path.exists('docId.json'):
-            with open('docId.json', 'r') as fin:
+        if os.path.exists(idFilename):
+            with open(idFilename, 'r') as fin:
                 docId = json.load(fin)['docId']
 
             for f in files:
@@ -310,7 +322,7 @@ def findReceiptsDoc(creds):
                     return docId
 
     # if we got here, we didn't find our file, create one
-    docId = createNewReceiptsDoc(creds, filename)
+    docId = createNewReceiptsDoc(creds, filename, idFilename)
     print(f"New {filename} doc created")
 
     return docId
